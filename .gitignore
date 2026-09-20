@@ -1,0 +1,15 @@
+# ---- 工作记忆与个人数据（不入库）----
+.workbuddy/
+
+# ---- 运行时本地数据（含用户练习记录，属隐私，不入库）----
+data/store.json
+
+# ---- 日志 ----
+*.log
+
+# ---- 系统/编辑器 ----
+.DS_Store
+Thumbs.db
+
+# 说明：本项目零依赖，无需 node_modules。
+# resource/ 下的模板 xlsx、life_sentences.xlsx 为有用资源，保留入库。
