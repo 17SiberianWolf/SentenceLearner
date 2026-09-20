@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SentenceLearner · 手敲练英文造句</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">SentenceLearner</div>
+      <nav class="tabs" id="tabs">
+        <button data-tab="practice" class="active">练习</button>
+        <button data-tab="errors">错句本</button>
+        <button data-tab="stats">统计</button>
+        <button data-tab="review">复习</button>
+        <button data-tab="patterns">句型</button>
+        <button data-tab="library">句子库</button>
+      </nav>
+      <span id="storeBadge" class="badge">存储：检测中…</span>
+    </header>
+
+    <!-- 练习页 -->
+    <main id="page-practice" class="page">
+      <div class="toolbar">
+        <div class="level-switch">
+          <button data-level="初级" class="active">初级</button>
+          <button data-level="高级">高级</button>
+        </div>
+        <select id="category" class="cat"></select>
+        <div class="settings">
+          <label>语速
+            <select id="rate">
+              <option value="0.5">0.5×</option>
+              <option value="0.75">0.75×</option>
+              <option value="0.9" selected>0.9×</option>
+              <option value="1.0">1.0×</option>
+              <option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option>
+            </select>
+          </label>
+          <label>发音
+            <select id="voice">
+              <option value="us">美式</option>
+              <option value="uk">英式</option>
+            </select>
+          </label>
+          <label class="review-toggle"><input type="checkbox" id="autoSpeak" checked /> 🔊 自动朗读</label>
+          <label class="review-toggle"><input type="checkbox" id="reviewMode" /> 🔁 复习模式</label>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div id="reviewBanner" class="review-banner hidden"></div>
+        <!-- 1. 中文意思 -->
+        <section class="prompt-card" aria-label="中文提示">
+          <div id="prompt" class="prompt-text"></div>
+        </section>
+
+        <!-- 2. 手写输入区 -->
+        <section class="write-card" aria-label="英文输入">
+          <label for="capture" class="write-label">根据中文意思，在下面输入完整英文句子</label>
+          <textarea id="capture" class="capture" rows="3" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="英文输入"></textarea>
+          <!-- 实时字符反馈 -->
+          <div id="feedback" class="feedback" aria-live="polite"></div>
+        </section>
+
+        <!-- 3. 答案原文区（默认隐藏） -->
+        <section id="answerPanel" class="answer-card hidden" aria-label="英文原文">
+          <div class="answer-label">英文原文</div>
+          <div id="answerText" class="answer-text"></div>
+          <div id="answerResult" class="answer-result"></div>
+        </section>
+
+        <!-- 4. 统计 -->
+        <div id="stats" class="stats"></div>
+
+        <!-- 5. 操作栏 -->
+        <nav id="actionbar" class="actionbar">
+          <button id="btnSpeak" class="primary" title="朗读整句（快捷键 L）">
+            <span class="icon">▶</span> 朗读
+          </button>
+          <button id="btnHint" title="按词逐步显示原文，辅助默写（快捷键 H）">
+            <span class="icon">✦</span> 提示
+          </button>
+          <button id="btnShowAnswer" title="显示完整英文原文，用于抄写（不判分）">
+            <span class="icon">☉</span> 显示答案
+          </button>
+          <button id="btnSubmit" title="提交判分（快捷键 Enter）">
+            <span class="icon">✓</span> 提交
+          </button>
+          <button id="btnCollect" title="收藏">
+            <span class="icon">☆</span> 收藏
+          </button>
+          <button id="btnNext" title="下一题（快捷键 →）">
+            下一题 <span class="icon">→</span>
+          </button>
+        </nav>
+
+        <div class="hint-guide">
+          练习流程：看中文 → 手写英文 → 不会点「朗读」听发音 → 还写不出点「提示」或「显示答案」抄写 → 写完点「提交」判分
+        </div>
+      </div>
+    </main>
+
+    <!-- 错句本页 -->
+    <section id="page-errors" class="page hidden">
+      <div class="errors-head">
+        <h2>错句本</h2>
+        <span id="errorsCount" class="muted"></span>
+        <button id="btnClearErrors" class="ghost">清空</button>
+      </div>
+      <ul id="errorList" class="error-list"></ul>
+      <div id="errorsEmpty" class="empty hidden">还没有需要复习的句子。练习中写错、或用提示/答案才写出的句子会自动进入这里。</div>
+    </section>
+
+    <!-- 统计页 -->
+    <section id="page-stats" class="page hidden">
+      <div class="stats-head">
+        <h2>学习统计</h2>
+        <span class="muted">数据跨会话保存在本机浏览器</span>
+      </div>
+
+      <!-- 概览卡片 -->
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-label">已练习次数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statRate">0%</div>
+          <div class="stat-label">掌握率</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statReview">0</div>
+          <div class="stat-label">待复习句数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statWpm">0</div>
+          <div class="stat-label">平均 WPM</div>
+        </div>
+      </div>
+
+      <!-- 初·高级分布 -->
+      <div class="stats-block">
+        <h3>难度分布</h3>
+        <div class="level-dist">
+          <div class="level-col">
+            <div class="level-name">初级（≤15 词）</div>
+            <div class="level-meta" id="lvBasic">已练 0 次 · 掌握率 0%</div>
+            <div class="bar"><span id="barBasic" class="bar-fill" style="width:0%"></span></div>
+          </div>
+          <div class="level-col">
+            <div class="level-name">高级（>15 词）</div>
+            <div class="level-meta" id="lvAdvanced">已练 0 次 · 掌握率 0%</div>
+            <div class="bar"><span id="barAdvanced" class="bar-fill" style="width:0%"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分类掌握率 -->
+      <div class="stats-block">
+        <h3>分类掌握率</h3>
+        <div id="catBars" class="cat-bars"></div>
+        <div id="catEmpty" class="empty hidden">还没有练习记录。去「练习」页写几句就会出现在统计里。</div>
+      </div>
+    </section>
+
+    <!-- 复习页（间隔重复） -->
+    <section id="page-review" class="page hidden">
+      <div class="review-head">
+        <h2>复习 · 间隔重复</h2>
+        <span id="reviewSummary" class="muted"></span>
+      </div>
+      <ul id="reviewList" class="review-list"></ul>
+      <div id="reviewEmpty" class="empty hidden">🎉 今日没有到期要复习的句子。去练习页正常练，或稍后再来。</div>
+      <button id="btnStartReview" class="btn-primary hidden">一键开始复习</button>
+    </section>
+
+    <!-- 句型训练页 -->
+    <section id="page-patterns" class="page hidden">
+      <div class="pat-head">
+        <h2>句型训练</h2>
+        <span class="muted">两个方向：日常/工作口头交流 · 工作邮件商务沟通</span>
+      </div>
+
+      <div class="group-tabs" id="patGroups">
+        <button data-group="oral" class="active">口头交流</button>
+        <button data-group="email">商务邮件</button>
+      </div>
+
+      <div class="mode-toggle" id="patModes">
+        <button data-mode="full" class="active">完整造句</button>
+        <button data-mode="blank">句型填空</button>
+      </div>
+
+      <div id="patProgress" class="pat-progress"></div>
+
+      <div class="stage">
+        <section class="pattern-card" id="patPatternCard">
+          <div class="pc-title" id="patPatternTitle"></div>
+          <div class="pc-formula" id="patPattern"></div>
+          <div class="pc-note" id="patNote"></div>
+          <div class="pc-examples" id="patExamples"></div>
+        </section>
+
+        <section class="prompt-card" aria-label="练习提示">
+          <div id="patPrompt" class="prompt-text"></div>
+          <div id="patSkeleton" class="skeleton hidden"></div>
+        </section>
+
+        <section class="write-card" aria-label="英文输入">
+          <label for="patCapture" class="write-label" id="patWriteLabel">根据中文意思，在下面输入完整英文句子</label>
+          <textarea id="patCapture" class="capture" rows="3" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="英文输入"></textarea>
+          <div id="patFeedback" class="feedback" aria-live="polite"></div>
+        </section>
+
+        <section id="patAnswerPanel" class="answer-card hidden" aria-label="参考答案">
+          <div class="answer-label" id="patAnswerLabel">参考答案</div>
+          <div id="patAnswerResult" class="answer-result"></div>
+          <div id="patAnswerText" class="answer-text"></div>
+        </section>
+
+        <div id="patStats" class="stats"></div>
+
+        <nav id="patActionbar" class="actionbar">
+          <button id="patSpeak" class="primary" title="朗读完整句子"><span class="icon">▶</span> 朗读</button>
+          <button id="patHint" title="逐步揭示答案"><span class="icon">✦</span> 提示</button>
+          <button id="patShowAnswer" title="显示完整参考答案"><span class="icon">☉</span> 显示答案</button>
+          <button id="patSubmit" title="提交判分"><span class="icon">✓</span> 提交</button>
+          <button id="patPrev" title="上一题">← 上一题</button>
+          <button id="patNext" title="下一题">下一题 <span class="icon">→</span></button>
+        </nav>
+
+        <div class="hint-guide">
+          句型训练：看句型公式与例句 → 看中文/填空 → 不会点「朗读」听发音 → 还写不出点「提示」或「显示答案」→ 写完自动提交并撒花庆祝
+        </div>
+      </div>
+
+      <div class="pat-wrong-head">
+        <h3>待巩固（错题）</h3>
+        <span id="patWrongCount" class="muted"></span>
+      </div>
+      <ul id="patWrongList" class="pat-wrong-list"></ul>
+      <div id="patWrongEmpty" class="empty hidden">本组还没有需要巩固的句型句。练错或用提示才写出的会自动进入这里。</div>
+    </section>
+
+    <!-- 句子库页 -->
+    <section id="page-library" class="page hidden">
+      <div class="lib-head">
+        <h2>句子库</h2>
+        <span class="muted">浏览全部句子，导入你的自定义句（支持 手动 / JSON / xlsx / csv）</span>
+      </div>
+
+      <!-- 导入面板 -->
+      <div class="import-panel">
+        <div class="import-title">导入自定义句</div>
+
+        <div class="import-grid">
+          <div class="import-col">
+            <div class="import-subtitle">① 手动添加</div>
+            <input id="manZh" class="inp" placeholder="中文意思，如：系统已稳定运行。" />
+            <input id="manEn" class="inp" placeholder="英文句子，如：The system has been running stably." />
+            <input id="manCat" class="inp" placeholder="分类（默认：自定义）" />
+            <button id="btnAddManual" class="btn-primary">添加</button>
+          </div>
+
+          <div class="import-col">
+            <div class="import-subtitle">② 粘贴 JSON 批量导入</div>
+            <textarea id="jsonPaste" class="inp ta" rows="4" placeholder='[{"zh":"...","en":"...","category":"..."}]'></textarea>
+            <button id="btnImportJson" class="btn-primary">导入 JSON</button>
+          </div>
+
+          <div class="import-col">
+            <div class="import-subtitle">③ 上传文件（.xlsx / .csv）</div>
+            <div class="file-hint">xlsx 按 template.xlsx 列序：分类 / 英文 / 译文标题 / 中文 / 音频地址</div>
+            <input id="fileInput" type="file" accept=".xlsx,.csv" class="file-inp" />
+            <div id="importMsg" class="import-msg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 筛选 + 列表 -->
+      <div class="lib-toolbar">
+        <select id="libLevel" class="cat">
+          <option value="全部">全部难度</option>
+          <option value="初级">初级</option>
+          <option value="高级">高级</option>
+        </select>
+        <select id="libCategory" class="cat"></select>
+        <span id="libCount" class="muted"></span>
+      </div>
+      <ul id="libList" class="lib-list"></ul>
+      <div id="libEmpty" class="empty hidden">没有符合条件的句子。</div>
+    </section>
+  </div>
+
+  <script src="sentences.js"></script>
+  <script src="advanced.js"></script>
+  <script src="life_sentences.js"></script>
+  <script src="patterns.js"></script>
+  <script src="engine.js"></script>
+  <script src="xlsx-read.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

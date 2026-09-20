@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 740" font-family="'Segoe UI','Microsoft YaHei',sans-serif" role="img">
+  <title>SentenceLearner 练习页低保真线框图 v2（宽松版）</title>
+  <desc>参考微信截图的两款 App 布局优化：大留白、中文提示居中、英文输入居中、底部图标操作栏（朗读/提示/提交/收藏/下一题）。橙框为 MVP 新增模块。</desc>
+
+  <rect x="16" y="16" width="648" height="708" rx="16" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.5"/>
+
+  <text x="40" y="56" font-size="18" font-weight="500" fill="#2C2C2A">SentenceLearner</text>
+  <text x="40" y="76" font-size="12" font-weight="400" fill="#5F5E5A">句子练习 · 中译英听写</text>
+
+  <rect x="476" y="40" width="70" height="30" rx="15" fill="#185FA5"/>
+  <text x="511" y="60" font-size="13" font-weight="500" fill="#FFFFFF" text-anchor="middle">初级</text>
+  <rect x="554" y="40" width="70" height="30" rx="15" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.5"/>
+  <text x="589" y="60" font-size="13" font-weight="400" fill="#5F5E5A" text-anchor="middle">高级</text>
+
+  <line x1="40" y1="98" x2="640" y2="98" stroke="#B4B2A9" stroke-width="0.5"/>
+
+  <text x="340" y="138" font-size="12" font-weight="400" fill="#888780" text-anchor="middle">分类：项目汇报 / 进度沟通 · 共 162 句</text>
+
+  <text x="340" y="180" font-size="12" font-weight="500" fill="#185FA5" text-anchor="middle">中文意思</text>
+  <rect x="80" y="196" width="520" height="120" rx="14" fill="#F8FAFC" stroke="#B4B2A9" stroke-width="0.5"/>
+  <text x="340" y="268" font-size="24" font-weight="500" fill="#2C2C2A" text-anchor="middle">我们已经完成了连铸机的调试，</text>
+  <text x="340" y="300" font-size="24" font-weight="500" fill="#2C2C2A" text-anchor="middle">目前设备运行稳定。</text>
+
+  <text x="340" y="368" font-size="12" font-weight="500" fill="#185FA5" text-anchor="middle">英文输入</text>
+  <text x="340" y="412" font-size="20" font-weight="400" font-family="Consolas,monospace" text-anchor="middle">
+    <tspan fill="#3B6D11">We have c</tspan><tspan fill="#A32D2D" text-decoration="underline">x</tspan><tspan fill="#3B6D11">ompleted</tspan><tspan fill="#888780"> the debugging of the caster.</tspan>
+  </text>
+  <text x="340" y="446" font-size="11" font-weight="400" fill="#888780" text-anchor="middle">绿=正确　红(下划线)=错误需重打　灰=待输入</text>
+  <text x="340" y="474" font-size="11" font-weight="400" fill="#185FA5" text-anchor="middle">不会写？点击底部「朗读」听完整句子，边听边写</text>
+
+  <text x="340" y="556" font-size="12" font-weight="400" fill="#5F5E5A" text-anchor="middle">第 3 / 20 句　·　正确率 86%　·　WPM 42</text>
+
+  <line x1="40" y1="592" x2="640" y2="592" stroke="#B4B2A9" stroke-width="0.5"/>
+
+  <g transform="translate(140,648)">
+    <circle cx="0" cy="0" r="28" fill="#185FA5"/>
+    <g transform="translate(-11,-13)" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5">
+      <path d="M0 3 L4 3 L8 0 L8 12 L4 9 L0 9 Z" fill="#FFFFFF" stroke="none"/>
+      <path d="M11 3 Q14 6 11 9" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+      <path d="M14 1 Q19 6 14 11" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+    </g>
+    <text x="0" y="50" font-size="12" font-weight="400" fill="#5F5E5A" text-anchor="middle">朗读</text>
+  </g>
+
+  <g transform="translate(240,648)">
+    <circle cx="0" cy="0" r="28" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.5"/>
+    <g transform="translate(-6,-13)" stroke="#5F5E5A" stroke-width="1.5" fill="none">
+      <circle cx="6" cy="5" r="5"/>
+      <path d="M3 12 L9 12"/>
+    </g>
+    <text x="0" y="50" font-size="12" font-weight="400" fill="#5F5E5A" text-anchor="middle">提示</text>
+  </g>
+
+  <g transform="translate(340,648)">
+    <circle cx="0" cy="0" r="28" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.5"/>
+    <g transform="translate(-9,-9)" stroke="#5F5E5A" stroke-width="1.5" fill="none">
+      <path d="M0 6 L6 12 L17 -3"/>
+    </g>
+    <text x="0" y="50" font-size="12" font-weight="400" fill="#5F5E5A" text-anchor="middle">提交</text>
+  </g>
+
+  <g transform="translate(440,648)">
+    <circle cx="0" cy="0" r="28" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.5"/>
+    <path transform="translate(-6,-12)" d="M6 0 L7.5 4 L12 4 L8.5 6.5 L10 12 L6 8.5 L2 12 L3.5 6.5 L0 4 L4.5 4 Z" fill="#5F5E5A"/>
+    <text x="0" y="50" font-size="12" font-weight="400" fill="#5F5E5A" text-anchor="middle">收藏</text>
+  </g>
+
+  <g transform="translate(540,648)">
+    <circle cx="0" cy="0" r="28" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.5"/>
+    <g transform="translate(-10,-9)" stroke="#5F5E5A" stroke-width="1.5" fill="none">
+      <path d="M0 6 L14 6"/>
+      <path d="M8 0 L14 6 L8 12"/>
+    </g>
+    <text x="0" y="50" font-size="12" font-weight="400" fill="#5F5E5A" text-anchor="middle">下一题</text>
+  </g>
+
+  <rect x="500" y="678" width="140" height="44" rx="8" fill="#FAEEDA" stroke="#EF9F27" stroke-width="0.5"/>
+  <text x="512" y="696" font-size="11" font-weight="500" fill="#854F0B">图例</text>
+  <text x="512" y="712" font-size="10.5" font-weight="400" fill="#854F0B">蓝圈=朗读(MVP新增)</text>
+  <text x="512" y="726" font-size="10.5" font-weight="400" fill="#854F0B">其余沿用 QL 引擎</text>
+</svg>
