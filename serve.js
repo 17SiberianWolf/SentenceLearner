@@ -82,7 +82,7 @@ const server = http.createServer(function (req, res) {
           const obj = JSON.parse(raw);
           if (typeof obj !== 'object' || obj === null) throw new Error('not object');
           const clean = {};
-          ['errors', 'collected', 'attempts', 'custom', 'sr', 'sl_pat_master', 'sl_pat_wrong'].forEach(function (k) {
+          ['errors', 'collected', 'attempts', 'custom', 'sr', 'sl_pat_master', 'sl_pat_wrong', 'sl_weakness'].forEach(function (k) {
             if (k in obj) clean[k] = obj[k];
           });
           writeStore(clean);
@@ -94,6 +94,45 @@ const server = http.createServer(function (req, res) {
       return;
     }
     sendJson(res, 405, { error: 'method not allowed' });
+    return;
+  }
+
+  // ---- Ollama 代理（本地大模型，零依赖；浏览器只调同源 8787） ----
+  const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
+
+  if (p === '/api/ollama/status') {
+    (function () {
+      fetch(OLLAMA_HOST + '/api/tags', { signal: AbortSignal.timeout(3000) })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { sendJson(res, 200, { ok: true, models: (j.models || []).map(function (m) { return m.name; }) }); })
+        .catch(function (e) { sendJson(res, 200, { ok: false, error: String((e && e.message) || e) }); });
+    })();
+    return;
+  }
+
+  if (p === '/api/ollama/chat') {
+    if (req.method !== 'POST') { sendJson(res, 405, { error: 'method not allowed' }); return; }
+    let raw = '';
+    let aborted = false;
+    req.on('data', function (c) { raw += c; if (raw.length > MAX_BODY) { aborted = true; req.destroy(); } });
+    req.on('end', function () {
+      if (aborted) { sendJson(res, 413, { error: 'payload too large' }); return; }
+      let body;
+      try { body = JSON.parse(raw); } catch (e) { sendJson(res, 400, { error: 'invalid json' }); return; }
+      const model = body.model || 'qwen2.5:7b';
+      const temp = (typeof body.temp === 'number') ? body.temp : 0.3;
+      const messages = Array.isArray(body.messages) ? body.messages : [];
+      const format = body.json ? 'json' : undefined;
+      fetch(OLLAMA_HOST + '/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: model, messages: messages, stream: false, temperature: temp, format: format }),
+        signal: AbortSignal.timeout(60000),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { sendJson(res, 200, { ok: true, content: (j && j.message && j.message.content) || '' }); })
+        .catch(function (e) { sendJson(res, 200, { ok: false, error: String((e && e.message) || e) }); });
+    });
     return;
   }
 

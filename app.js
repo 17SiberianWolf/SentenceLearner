@@ -80,8 +80,10 @@
       sr: loadSR(),
       sl_pat_master: [].slice.call(patMaster),
       sl_pat_wrong: [].slice.call(patWrong),
+      sl_weakness: loadWeaknessLocal(),
     };
   }
+  function loadWeaknessLocal() { try { return JSON.parse(localStorage.getItem('sl_weakness') || '{}'); } catch (e) { return {}; } }
   function fetchStore() {
     if (typeof fetch !== 'function') return Promise.resolve(null);
     return fetch('/api/store', { cache: 'no-store' })
@@ -155,6 +157,13 @@
         Object.keys(srvSR).forEach(function (k) { mergedSR[k] = srvSR[k]; });
         Object.keys(locSR).forEach(function (k) { if (!(k in mergedSR)) mergedSR[k] = locSR[k]; });
         saveSR(mergedSR);
+        // 薄弱点诊断：服务端 + 浏览器缓存（计数相加）
+        var srvW = (server && typeof server.sl_weakness === 'object' && server.sl_weakness) ? server.sl_weakness : {};
+        var locW = loadWeaknessLocal();
+        var mergedW = {};
+        Object.keys(srvW).forEach(function (k) { mergedW[k] = srvW[k] || 0; });
+        Object.keys(locW).forEach(function (k) { mergedW[k] = (mergedW[k] || 0) + (locW[k] || 0); });
+        try { localStorage.setItem('sl_weakness', JSON.stringify(mergedW)); } catch (e) {}
         // 合并结果写回磁盘，并刷新浏览器缓存
         pushStore(snapshot());
         saveSet('sl_errors', state.errors);
@@ -248,6 +257,7 @@
     revealed: false,
     hintWords: 0,
     startTime: Date.now(),
+    drill: { active: false, mode: 'substitution', base: '', cues: [], index: 0 },
   };
 
   function effectiveSentences() { return S.concat(A, L, state.custom); }
@@ -347,6 +357,53 @@
     $('answerText').innerHTML = '';
     $('btnHint').disabled = false;
     $('btnShowAnswer').disabled = false;
+    const hp = $('aiHintPanel'); if (hp) { hp.classList.add('hidden'); hp.innerHTML = ''; }
+    const bp = $('aiBreakdownPanel'); if (bp) { bp.classList.add('hidden'); bp.innerHTML = ''; }
+  }
+
+  // ---------- AI 教练：渐进提示梯（不直接给答案，分 3 级） ----------
+  function aiHint() {
+    const s = current();
+    const panel = $('aiHintPanel');
+    if (!s || !panel) return;
+    if (!window.Coach || !Coach.isEnabled()) { alert('AI 教练未启用，或 Ollama 未连接。'); return; }
+    panel.classList.remove('hidden');
+    panel.innerHTML = '<div class="ai-loading">AI 正在生成提示…</div>';
+    Coach.callCoach('hint', { target: s.zh, reference: s.en }, { json: true, temp: 0.3 }).then(function (r) {
+      if (!r || !r.ok) { panel.innerHTML = '<div class="ai-err">AI 暂时不可用：' + escapeHtml((r && r.error) || '') + '</div>'; return; }
+      const d = r.data || {};
+      panel.innerHTML =
+        '<div class="hint-ladder">' +
+        '<div class="hl-row"><span class="hl-label">① 关键词</span><span class="hl-val">' + escapeHtml(d.level1_keywords || '—') + '</span></div>' +
+        '<div class="hl-row"><span class="hl-label">② 句型骨架</span><span class="hl-val">' + escapeHtml(d.level2_skeleton || '—') + '</span></div>' +
+        '<div class="hl-row"><span class="hl-label">③ 近完整</span><span class="hl-val">' + escapeHtml(d.level3_near || '—') + '</span></div>' +
+        '</div>';
+    });
+  }
+
+  // ---------- AI 教练：句型拆解讲解（提交/揭示答案时默认展示，可折叠） ----------
+  function showBreakdown(zh, en, userText, recordWeak) {
+    const panel = $('aiBreakdownPanel');
+    if (!panel) return;
+    panel.classList.remove('hidden');
+    if (!window.Coach || !Coach.isEnabled()) { panel.classList.add('hidden'); return; }
+    panel.innerHTML = '<details open class="breakdown"><summary>句型拆解（AI）</summary><div class="ai-loading">AI 正在解析句型…</div></details>';
+    Coach.callCoach('breakdown', { target: zh, reference: en, userText: userText }, { json: true, temp: 0.2 }).then(function (r) {
+      if (!r || !r.ok) {
+        panel.innerHTML = '<details class="breakdown"><summary>句型拆解（AI）</summary><div class="ai-err">AI 暂时不可用：' + escapeHtml((r && r.error) || '') + '</div></details>';
+        return;
+      }
+      const d = r.data || {};
+      const structure = Array.isArray(d.structure) ? d.structure.map(function (x) { return '<li>' + escapeHtml(x) + '</li>'; }).join('') : '';
+      const pitfalls = Array.isArray(d.pitfalls) ? d.pitfalls.map(function (x) { return '<li>' + escapeHtml(x) + '</li>'; }).join('') : '';
+      panel.innerHTML = '<details open class="breakdown"><summary>句型拆解（AI）</summary>' +
+        (d.pattern ? '<div class="bd-row"><span class="bd-label">句型公式</span><span class="bd-val">' + escapeHtml(d.pattern) + '</span></div>' : '') +
+        (structure ? '<div class="bd-row"><span class="bd-label">结构</span><ul class="bd-list">' + structure + '</ul></div>' : '') +
+        (d.mnemonic ? '<div class="bd-row"><span class="bd-label">记忆口诀</span><span class="bd-val">' + escapeHtml(d.mnemonic) + '</span></div>' : '') +
+        (pitfalls ? '<div class="bd-row"><span class="bd-label">易错点</span><ul class="bd-list">' + pitfalls + '</ul></div>' : '') +
+        '</details>';
+      if (recordWeak && d.category) Coach.recordWeakness(d.category);
+    });
   }
 
   function updateStats() {
@@ -417,6 +474,7 @@
     const s = current();
     if (!s || state.phase === 'answered') return;
     showAnswer(s.en);
+    showBreakdown(s.zh, s.en, state.input, false); // 揭示答案也展示拆解，但不记薄弱点
   }
 
   // 提交判分：掌握度规则见 PRD/本次 grill 结论。
@@ -465,6 +523,9 @@
       res.textContent = isCorrect ? '正确！掌握这句了。' : '再核对一下，答案已显示。';
     }
     if (isCorrect) celebrate();
+
+    // AI 教练：展示句型拆解（默认展开，可折叠）；出错时记录薄弱点类别。
+    showBreakdown(s.zh, s.en, val, !isCorrect);
 
     lockControls();
   }
@@ -862,6 +923,7 @@
   }
 
   function patRender() {
+    if (pat.drill.active) { patRenderFeedback(); return; } // Drill 模式：提示文案由 patDrillRenderCue 管理
     const list = patList();
     if (list.length === 0) return;
     if (pat.index >= list.length) pat.index = 0;
@@ -897,7 +959,10 @@
     patRenderFeedback();
   }
 
-  function patTarget() { const it = patCurrent(); if (!it) return ''; return pat.mode === 'blank' ? it.gap : it.en; }
+  function patTarget() {
+    if (pat.drill.active) { const c = pat.drill.cues[pat.drill.index]; return c ? (c.expect || '') : ''; }
+    const it = patCurrent(); if (!it) return ''; return pat.mode === 'blank' ? it.gap : it.en;
+  }
 
   function patRenderFeedback() {
     const target = patTarget();
@@ -918,6 +983,7 @@
   }
 
   function patOnInput() {
+    if (pat.drill.active) { patDrillOnInput(); return; }
     const it = patCurrent();
     if (!it || pat.phase === 'answered') return;
     const ta = $('patCapture');
@@ -981,7 +1047,132 @@
     $('patShowAnswer').disabled = true;
   }
 
+  // ---------- FSI Drills（AI 生成同句型无限变体，三模式） ----------
+  function patDrillModeLabel(m) {
+    return m === 'morphology' ? '换人称/时态' : (m === 'transformation' ? '肯否疑转换' : '替换词');
+  }
+  function patDrillStart() {
+    if (!window.Coach || !Coach.isEnabled()) { alert('AI 教练未启用或 Ollama 未连接，无法生成 Drill。可退出后用固定句型练习。'); return; }
+    const it = patCurrent();
+    if (!it) return;
+    const mode = ($('patDrillMode') && $('patDrillMode').value) || 'substitution';
+    pat.drill = { active: true, mode: mode, base: it.en, cues: [], index: 0 };
+    pat.input = '';
+    $('patCapture').value = '';
+    $('patCapture').disabled = false;
+    $('patAnswerPanel').classList.add('hidden');
+    $('patAnswerText').innerHTML = '';
+    $('patSkeleton').classList.add('hidden');
+    $('patPrompt').classList.remove('hidden');
+    $('patPrompt').textContent = 'AI 正在生成「' + patDrillModeLabel(mode) + '」操练…';
+    $('patWriteLabel').textContent = '根据上方指令，写出变换后的英文句子';
+    $('patDrillBanner').classList.remove('hidden');
+    $('patDrillExit').classList.remove('hidden');
+    $('patDrillProgress').textContent = '';
+    Coach.callCoach('drill', { base: it.en, mode: mode }, { json: true, temp: 0.4 }).then(function (r) {
+      if (!r || !r.ok || !r.data || !Array.isArray(r.data.cues) || !r.data.cues.length) {
+        $('patPrompt').textContent = 'Drill 生成失败：' + escapeHtml((r && r.error) || '无变体') + '（可退出用固定句型练习）';
+        return;
+      }
+      pat.drill.cues = r.data.cues;
+      pat.drill.index = 0;
+      pat.phase = 'typing';
+      patDrillRenderCue();
+    });
+  }
+  function patDrillRenderCue() {
+    const cue = pat.drill.cues[pat.drill.index];
+    if (!cue) { patDrillFinish(); return; }
+    $('patPrompt').textContent = '指令：' + (cue.transform || '写下一句');
+    $('patWriteLabel').textContent = '根据指令写出英文';
+    pat.input = '';
+    $('patCapture').value = '';
+    $('patCapture').disabled = false;
+    $('patAnswerPanel').classList.add('hidden');
+    $('patFeedback').innerHTML = '';
+    $('patDrillProgress').textContent = 'Drill ' + (pat.drill.index + 1) + '/' + pat.drill.cues.length;
+    if (cue.expect) speak(cue.expect); // 听打合一
+    $('patCapture').focus();
+  }
+  function patDrillOnInput() {
+    if (pat.phase === 'answered') return;
+    const ta = $('patCapture');
+    let val = ta.value;
+    const tgt = patTarget();
+    const fw = E.firstWrongIndex(tgt, val);
+    const allow = fw < 0 ? tgt.length : fw + 1;
+    if (val.length > allow) { val = val.slice(0, allow); ta.value = val; }
+    pat.input = val;
+    patRenderFeedback();
+    if (val === tgt) patDrillSubmit(); // 写对自动提交
+  }
+  function patDrillSubmit() {
+    const cue = pat.drill.cues[pat.drill.index];
+    if (!cue) return;
+    if (pat.phase === 'answered') { patDrillNext(); return; }
+    const isCorrect = norm(pat.input || '') === norm(cue.expect || '');
+    pat.phase = 'answered';
+    const box = $('patAnswerPanel');
+    const res = $('patAnswerResult');
+    box.classList.remove('hidden');
+    $('patAnswerText').textContent = cue.expect || '';
+    box.classList.remove('flash-ok', 'flash-wrong');
+    res.className = 'answer-result';
+    void box.offsetWidth;
+    box.classList.add(isCorrect ? 'flash-ok' : 'flash-wrong');
+    res.classList.add(isCorrect ? 'ok' : 'wrong');
+    res.textContent = isCorrect ? '正确！语感 +1' : '正确答案已显示，再来一次就熟了';
+    setTimeout(function () { box.classList.remove('flash-ok', 'flash-wrong'); }, 400);
+    if (isCorrect) celebrate();
+    $('patCapture').disabled = true;
+    $('patHint').disabled = true;
+    $('patShowAnswer').disabled = true;
+    $('patSubmit').disabled = true;
+    $('patSubmit').textContent = '已提交';
+    // 闭环补强（写错时生成同类小练习）
+    if (!isCorrect) {
+      Coach.callCoach('remedial', { text: pat.input, reference: cue.expect }, { json: true, temp: 0.3 }).then(function (r) {
+        if (r && r.ok && r.data && Array.isArray(r.data.drills) && r.data.drills.length) {
+          const items = r.data.drills.map(function (d) {
+            return '<li>' + escapeHtml(d.zh || '') + ' → <b>' + escapeHtml(d.en || '') + '</b></li>';
+          }).join('');
+          const rd = document.createElement('div');
+          rd.className = 'remedial';
+          rd.innerHTML = '🔁 补强练习：<ul>' + items + '</ul>';
+          box.appendChild(rd);
+        }
+      });
+    }
+  }
+  function patDrillNext() {
+    pat.drill.index += 1;
+    if (pat.drill.index >= pat.drill.cues.length) { patDrillFinish(); return; }
+    pat.phase = 'typing';
+    $('patHint').disabled = false;
+    $('patShowAnswer').disabled = false;
+    $('patSubmit').disabled = false;
+    $('patSubmit').innerHTML = '<span class="icon">✓</span> 提交';
+    patDrillRenderCue();
+  }
+  function patDrillFinish() {
+    $('patPrompt').textContent = '🎉 本轮 Drill 完成！可退出或换个模式再来一轮。';
+    $('patWriteLabel').textContent = '';
+    $('patCapture').value = '';
+    $('patCapture').disabled = true;
+    $('patFeedback').innerHTML = '';
+    $('patDrillProgress').textContent = '';
+    $('patSubmit').textContent = '已完成';
+  }
+  function patDrillExit() {
+    pat.drill.active = false;
+    $('patDrillBanner').classList.add('hidden');
+    $('patDrillExit').classList.add('hidden');
+    patReset();
+    patRender();
+  }
+
   function patSubmit() {
+    if (pat.drill.active) { patDrillSubmit(); return; }
     const it = patCurrent();
     if (!it) return;
     if (pat.phase === 'answered') { patNext(); return; }
@@ -1016,12 +1207,14 @@
   }
 
   function patNext() {
+    if (pat.drill.active) { patDrillNext(); return; }
     const list = patList();
     if (list.length === 0) return;
     pat.index = pat.index < list.length - 1 ? pat.index + 1 : 0;
     patReset(); patRender(); $('patCapture').focus();
   }
   function patPrev() {
+    if (pat.drill.active) { return; } // Drill 模式用「提交」逐变体推进
     const list = patList();
     if (list.length === 0) return;
     pat.index = pat.index > 0 ? pat.index - 1 : list.length - 1;
@@ -1029,6 +1222,7 @@
   }
 
   function patSetGroup(g) {
+    if (pat.drill.active) patDrillExit();
     pat.group = g;
     pat.index = 0;
     pat.mode = 'full';
@@ -1041,6 +1235,7 @@
     patReset(); patRender(); renderPatWrong(); $('patCapture').focus();
   }
   function patSetMode(m) {
+    if (pat.drill.active) patDrillExit();
     pat.mode = m;
     Array.prototype.forEach.call(document.querySelectorAll('#patModes button'), function (b) {
       b.classList.toggle('active', b.dataset.mode === m);
@@ -1156,6 +1351,31 @@
         '<div class="cat-rate">' + o.rate + '%</div>';
       box.appendChild(row);
     });
+
+    // 薄弱点诊断看板（仅诊断，不记对错；来自 AI 拆解的 category 计数）
+    const wbox = $('weakBars');
+    if (wbox) {
+      const w = (window.Coach && Coach.getWeakness) ? Coach.getWeakness() : {};
+      const order = ['tense', 'word_order', 'preposition', 'article', 'vocabulary', 'other'];
+      const label = { tense: '时态', word_order: '语序', preposition: '介词', article: '冠词', vocabulary: '词汇', other: '其他' };
+      const entries = order.filter(function (k) { return w[k]; }).map(function (k) { return { k: k, n: w[k] }; });
+      const maxN = entries.reduce(function (m, e) { return Math.max(m, e.n); }, 0);
+      wbox.innerHTML = '';
+      if (entries.length === 0) { $('weakEmpty').classList.remove('hidden'); }
+      else {
+        $('weakEmpty').classList.add('hidden');
+        entries.sort(function (a, b) { return b.n - a.n; }).forEach(function (e) {
+          const row = document.createElement('div');
+          row.className = 'cat-row';
+          const pct = maxN ? Math.round((e.n / maxN) * 100) : 0;
+          row.innerHTML =
+            '<div class="cat-name">' + (label[e.k] || e.k) + ' <span class="cat-sub">出错 ' + e.n + ' 次</span></div>' +
+            '<div class="bar"><span class="bar-fill" style="width:' + pct + '%"></span></div>' +
+            '<div class="cat-rate">' + e.n + '</div>';
+          wbox.appendChild(row);
+        });
+      }
+    }
   }
 
   function init() {
@@ -1164,6 +1384,17 @@
     if (as) {
       as.checked = (function () { try { return localStorage.getItem('sl_autospeak') !== 'false'; } catch (e) { return true; } })();
       as.addEventListener('change', function () { try { localStorage.setItem('sl_autospeak', as.checked ? 'true' : 'false'); } catch (e) {} });
+    }
+    // AI 教练设置（开关 + 模型名，持久化）
+    const aiEn = $('aiEnabled');
+    if (aiEn) {
+      aiEn.checked = (window.Coach && Coach.isEnabled()) !== false;
+      aiEn.addEventListener('change', function () { if (window.Coach) Coach.setEnabled(aiEn.checked); refreshAiButtons(); });
+    }
+    const aiMd = $('aiModel');
+    if (aiMd) {
+      aiMd.value = (window.Coach && Coach.getModel()) || 'qwen2.5:7b';
+      aiMd.addEventListener('change', function () { if (window.Coach) Coach.setModel(aiMd.value); });
     }
     initCategories();
     buildList();
@@ -1175,6 +1406,7 @@
     });
     $('btnSpeak').addEventListener('click', function () { const s = current(); if (s) speak(s.en); });
     $('btnHint').addEventListener('click', hint);
+    $('btnAiHint').addEventListener('click', aiHint);
     $('btnShowAnswer').addEventListener('click', showAnswerClicked);
     $('btnSubmit').addEventListener('click', submit);
     $('btnCollect').addEventListener('click', collect);
@@ -1268,6 +1500,9 @@
     $('patHint').addEventListener('click', patHint);
     $('patShowAnswer').addEventListener('click', patShowAnswer);
     $('patSubmit').addEventListener('click', patSubmit);
+    // FSI Drills
+    $('patDrillBtn').addEventListener('click', patDrillStart);
+    $('patDrillExit').addEventListener('click', patDrillExit);
     $('patNext').addEventListener('click', patNext);
     $('patPrev').addEventListener('click', patPrev);
     $('patWrongList').addEventListener('click', function (e) {
@@ -1303,7 +1538,22 @@
       window.speechSynthesis.onvoiceschanged = function () { window.speechSynthesis.getVoices(); };
     }
     initStorage();
+    // AI 教练：探活状态灯，并按可用性启用/禁用 AI 按钮
+    if (window.Coach) { Coach.updateStatus(refreshAiButtons); }
     focusCapture();
+  }
+
+  // 根据 AI 是否启用/可用，刷新练习页与句型页相关按钮的可用态
+  function refreshAiButtons() {
+    const enabled = window.Coach && Coach.isEnabled();
+    const ok = window.Coach && Coach.status && Coach.status.ok;
+    const usable = enabled && ok;
+    const aiHintBtn = $('btnAiHint'); if (aiHintBtn) aiHintBtn.disabled = !usable;
+    const drillBtn = $('patDrillBtn'); if (drillBtn) drillBtn.disabled = !usable;
+    const aiEn = $('aiEnabled');
+    if (aiEn && !enabled) {
+      const h = $('aiHintPanel'); if (h) { h.classList.remove('hidden'); h.innerHTML = '<div class="ai-err">AI 教练已关闭，在工具栏勾选「🤖 AI 教练」并连接 Ollama 后可用。</div>'; }
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
