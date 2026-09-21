@@ -443,6 +443,39 @@ body {
 .remedial li { margin: 3px 0; }
 .remedial b { color: #137333; }
 
+/* P1 ④ 练习页智能补强（内联小测） */
+#aiRemedialPanel .ai-btn { margin-bottom: 8px; }
+.remedial-title { font-size: 13px; color: var(--muted, #6b7280); margin: 6px 0; }
+.remedial-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.remedial-zh { flex: 1 1 100%; font-size: 14px; color: var(--ink, #1f2937); }
+.remedial-input {
+  flex: 1 1 200px; padding: 7px 10px; border: 1px solid var(--border, #e3e8ef); border-radius: 8px;
+  background: #fff; color: var(--ink, #1f2937); font-size: 14px;
+}
+.remedial-input:disabled { background: #f3f4f6; color: var(--muted, #6b7280); }
+.remedial-check { font-size: 13px; padding: 6px 12px; }
+.remedial-fb { font-size: 13px; font-weight: 600; min-width: 56px; }
+.remedial-fb.ok { color: var(--ok, #16a34a); }
+.remedial-fb.wrong { color: var(--wrong, #dc2626); }
+
+/* P1 ⑥ 导师问答面板 */
+.tutor { text-align: left; border: 1px solid var(--border, #e3e8ef); border-radius: 12px; padding: 10px 12px; margin-top: 8px; background: #fff; }
+.tutor summary { font-weight: 700; color: var(--accent, #185fa5); cursor: pointer; }
+.tutor-log {
+  max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+  margin: 10px 0; padding: 8px; background: #f7f9fc; border-radius: 10px;
+}
+.tutor-bubble { max-width: 92%; padding: 8px 11px; border-radius: 12px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.tutor-bubble.b-user { align-self: flex-end; background: var(--accent, #185fa5); color: #fff; border-bottom-right-radius: 3px; }
+.tutor-bubble.b-assistant { align-self: flex-start; background: #fff; color: var(--ink, #1f2937); border: 1px solid var(--border, #e3e8ef); border-bottom-left-radius: 3px; }
+.tutor-bubble.tutor-loading { opacity: .6; font-style: italic; }
+.tutor-input-row { display: flex; gap: 8px; }
+.tutor-input-row input {
+  flex: 1 1 auto; padding: 8px 10px; border: 1px solid var(--border, #e3e8ef); border-radius: 8px;
+  background: #fff; color: var(--ink, #1f2937); font-size: 14px;
+}
+.tutor-input-row .ai-btn { white-space: nowrap; }
+
 /* 句型页 Drill 控制条 */
 .pat-drill-bar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;

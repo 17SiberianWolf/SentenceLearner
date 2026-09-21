@@ -80,17 +80,16 @@
     }
   }
 
-  // ---- 通用调用：POST /api/ollama/chat ----
-  function callCoach(task, payload, opts) {
+  // ---- 底层调用：直接传 messages 数组，POST /api/ollama/chat ----
+  function rawChat(msgs, opts) {
     opts = opts || {};
     return new Promise(function (resolve) {
       if (typeof fetch !== 'function') { resolve({ ok: false, error: '当前环境不支持 fetch' }); return; }
-      const msgs = buildMessages(task, payload);
-      if (!msgs) { resolve({ ok: false, error: '未知任务: ' + task }); return; }
+      if (!msgs || !msgs.length) { resolve({ ok: false, error: '空消息' }); return; }
       fetch('/api/ollama/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: getModel(), messages: msgs, task: task, json: !!opts.json, temp: (typeof opts.temp === 'number' ? opts.temp : 0.3) })
+        body: JSON.stringify({ model: getModel(), messages: msgs, task: opts.task, json: !!opts.json, temp: (typeof opts.temp === 'number' ? opts.temp : 0.3) })
       })
         .then(function (r) { return r.json(); })
         .then(function (j) {
@@ -106,6 +105,30 @@
         })
         .catch(function (e) { resolve({ ok: false, error: String((e && e.message) || e) }); });
     });
+  }
+
+  // ---- 通用调用（单轮任务） ----
+  function callCoach(task, payload, opts) {
+    opts = opts || {};
+    const msgs = buildMessages(task, payload);
+    if (!msgs) return Promise.resolve({ ok: false, error: '未知任务: ' + task });
+    return rawChat(msgs, Object.assign({}, opts, { task: task }));
+  }
+
+  // ---- 导师问答：多轮（history = [{q, a}, ...]，由调用方持有，刷新即清空） ----
+  function buildTutorMessages(question, context, history) {
+    const sys = '你是耐心的英文教练，用中文解释，必要时给公式+高亮例句+口诀。保持简短(≤120 字)，鼓励为主。';
+    const msgs = [{ role: 'system', content: sys }];
+    (history || []).forEach(function (h) {
+      if (h && h.q) msgs.push({ role: 'user', content: h.q });
+      if (h && h.a) msgs.push({ role: 'assistant', content: h.a });
+    });
+    msgs.push({ role: 'user', content: (question || '') + (context ? ('\n（上下文：' + context + '）') : '') });
+    return msgs;
+  }
+  function askTutor(question, context, history, opts) {
+    opts = opts || {};
+    return rawChat(buildTutorMessages(question, context, history), { json: false, temp: (typeof opts.temp === 'number' ? opts.temp : 0.4) });
   }
 
   // ---- 探活 + 状态灯 ----
@@ -136,6 +159,7 @@
     recordWeakness: recordWeakness,
     getWeakness: getWeakness,
     callCoach: callCoach,
+    askTutor: askTutor,
     updateStatus: updateStatus,
     status: status,
   };

@@ -359,6 +359,11 @@
     $('btnShowAnswer').disabled = false;
     const hp = $('aiHintPanel'); if (hp) { hp.classList.add('hidden'); hp.innerHTML = ''; }
     const bp = $('aiBreakdownPanel'); if (bp) { bp.classList.add('hidden'); bp.innerHTML = ''; }
+    // P1 ④⑥：清掉补强面板与导师问答（新一题重新开始）
+    const rp = $('aiRemedialPanel'); if (rp) { rp.classList.add('hidden'); const rl = $('aiRemedialList'); if (rl) rl.innerHTML = ''; const rb = $('btnAiRemedial'); if (rb) rb.disabled = false; }
+    const tp = $('aiTutorPanel'); if (tp) { tp.classList.add('hidden'); }
+    const tl = $('tutorLog'); if (tl) tl.innerHTML = '';
+    tutorHistory = [];
   }
 
   // ---------- AI 教练：渐进提示梯（不直接给答案，分 3 级） ----------
@@ -404,6 +409,108 @@
         '</details>';
       if (recordWeak && d.category) Coach.recordWeakness(d.category);
     });
+  }
+
+  // ---------- P1 ④ AI 教练：练习页闭环补强（写错后手动触发，内联同类小测） ----------
+  var remedialDrills = [];
+  function practiceRemedial() {
+    const s = current();
+    if (!s) return;
+    const listEl = $('aiRemedialList');
+    const btn = $('btnAiRemedial');
+    if (!listEl) return;
+    if (!window.Coach || !Coach.isEnabled()) { alert('AI 教练未启用或 Ollama 未连接，无法生成补强练习。'); return; }
+    if (btn) btn.disabled = true;
+    listEl.innerHTML = '<div class="ai-loading">AI 正在生成针对性补强练习…</div>';
+    Coach.callCoach('remedial', { text: state.input, reference: s.en }, { json: true, temp: 0.3 }).then(function (r) {
+      if (!r || !r.ok || !r.data || !Array.isArray(r.data.drills) || !r.data.drills.length) {
+        listEl.innerHTML = '<div class="ai-err">补强生成失败：' + escapeHtml((r && r.error) || '无变体') + '</div>';
+        if (btn) btn.disabled = false;
+        return;
+      }
+      renderRemedialDrills(r.data.drills);
+    });
+  }
+  function renderRemedialDrills(drills) {
+    remedialDrills = drills;
+    const listEl = $('aiRemedialList');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="remedial-title">🔁 智能补强 · 同类小练习（写完点「检查」看答案）</div>';
+    drills.forEach(function (d, i) {
+      const item = document.createElement('div');
+      item.className = 'remedial-item';
+      const zh = document.createElement('div');
+      zh.className = 'remedial-zh';
+      zh.textContent = (i + 1) + '. ' + (d.zh || '');
+      const inp = document.createElement('input');
+      inp.className = 'remedial-input';
+      inp.placeholder = '写出英文';
+      const btn = document.createElement('button');
+      btn.className = 'remedial-check ai-btn';
+      btn.textContent = '检查';
+      const fb = document.createElement('span');
+      fb.className = 'remedial-fb';
+      btn.addEventListener('click', function () {
+        const ok = norm(inp.value) === norm((remedialDrills[i] && remedialDrills[i].en) || '');
+        inp.disabled = true; btn.disabled = true;
+        fb.textContent = ok ? '✓ 正确' : ('✗ ' + ((remedialDrills[i] && remedialDrills[i].en) || ''));
+        fb.className = 'remedial-fb ' + (ok ? 'ok' : 'wrong');
+      });
+      item.appendChild(zh); item.appendChild(inp); item.appendChild(btn); item.appendChild(fb);
+      listEl.appendChild(item);
+    });
+  }
+
+  // ---------- P1 ⑥ AI 教练：导师问答（练习页答案区，多轮，带当前句上下文） ----------
+  var tutorHistory = [];
+  function askTutor() {
+    const s = current();
+    if (!s) return;
+    if (!window.Coach || !Coach.isEnabled()) { alert('AI 教练未启用或 Ollama 未连接。'); return; }
+    const inp = $('tutorInput');
+    if (!inp) return;
+    const q = (inp.value || '').trim();
+    if (!q) return;
+    inp.value = '';
+    addTutorBubble('user', q);
+    const loading = addTutorBubble('assistant', 'AI 思考中…');
+    if (loading) loading.classList.add('tutor-loading');
+    const ctx = '中文「' + s.zh + '」 标准英文「' + s.en + '」 用户写「' + (state.input || '(未写)') + '」';
+    Coach.askTutor(q, ctx, tutorHistory, { temp: 0.4 }).then(function (r) {
+      if (loading && loading.parentNode) loading.parentNode.removeChild(loading);
+      const ans = (r && r.ok && r.text) ? r.text : ('AI 暂时不可用：' + escapeHtml((r && r.error) || ''));
+      addTutorBubble('assistant', ans);
+      if (r && r.ok) tutorHistory.push({ q: q, a: ans });
+    });
+  }
+  function addTutorBubble(role, text) {
+    const log = $('tutorLog');
+    if (!log) return null;
+    const d = document.createElement('div');
+    d.className = 'tutor-bubble ' + (role.indexOf('assistant') >= 0 ? 'b-assistant' : 'b-user');
+    d.textContent = text;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+    return d;
+  }
+
+  // ---------- P1 ⑤ 薄弱点看板驱动开练（映射最弱类别 → FSI Drill 模式） ----------
+  var WEAK_LABEL = { tense: '时态', word_order: '语序', preposition: '介词', article: '冠词', vocabulary: '词汇', other: '其他' };
+  var WEAK_TO_DRILL = { tense: 'transformation', word_order: 'morphology', preposition: 'substitution', article: 'substitution', vocabulary: 'substitution', other: 'substitution' };
+  function weakTopCategory() {
+    const w = (window.Coach && Coach.getWeakness) ? Coach.getWeakness() : {};
+    const order = ['tense', 'word_order', 'preposition', 'article', 'vocabulary', 'other'];
+    var best = null, bn = 0;
+    order.forEach(function (k) { if (w[k] && w[k] > bn) { bn = w[k]; best = k; } });
+    return best;
+  }
+  function weakStartDrill() {
+    const top = weakTopCategory();
+    const mode = WEAK_TO_DRILL[top] || 'substitution';
+    switchTab('patterns');
+    const sel = $('patDrillMode');
+    if (sel) sel.value = mode;
+    patDrillStart();
   }
 
   function updateStats() {
@@ -475,6 +582,7 @@
     if (!s || state.phase === 'answered') return;
     showAnswer(s.en);
     showBreakdown(s.zh, s.en, state.input, false); // 揭示答案也展示拆解，但不记薄弱点
+    if (window.Coach && Coach.isEnabled()) { const tp = $('aiTutorPanel'); if (tp) tp.classList.remove('hidden'); } // P1 ⑥：揭示答案也允许追问
   }
 
   // 提交判分：掌握度规则见 PRD/本次 grill 结论。
@@ -526,6 +634,11 @@
 
     // AI 教练：展示句型拆解（默认展开，可折叠）；出错时记录薄弱点类别。
     showBreakdown(s.zh, s.en, val, !isCorrect);
+
+    // P1 ④：写错后展示智能补强入口（手动点才生成）
+    if (!isCorrect && window.Coach && Coach.isEnabled()) { const rp = $('aiRemedialPanel'); if (rp) rp.classList.remove('hidden'); }
+    // P1 ⑥：展示导师问答面板（带当前句上下文，可多轮追问）
+    if (window.Coach && Coach.isEnabled()) { const tp = $('aiTutorPanel'); if (tp) tp.classList.remove('hidden'); }
 
     lockControls();
   }
@@ -1361,8 +1474,11 @@
       const entries = order.filter(function (k) { return w[k]; }).map(function (k) { return { k: k, n: w[k] }; });
       const maxN = entries.reduce(function (m, e) { return Math.max(m, e.n); }, 0);
       wbox.innerHTML = '';
-      if (entries.length === 0) { $('weakEmpty').classList.remove('hidden'); }
-      else {
+      const wbtn = $('btnWeakDrill');
+      if (entries.length === 0) {
+        $('weakEmpty').classList.remove('hidden');
+        if (wbtn) wbtn.classList.add('hidden');
+      } else {
         $('weakEmpty').classList.add('hidden');
         entries.sort(function (a, b) { return b.n - a.n; }).forEach(function (e) {
           const row = document.createElement('div');
@@ -1374,6 +1490,11 @@
             '<div class="cat-rate">' + e.n + '</div>';
           wbox.appendChild(row);
         });
+        // P1 ⑤：按最弱类别推荐对应 FSI Drill 模式，一键开练
+        if (wbtn) {
+          wbtn.textContent = '🎯 针对最弱项「' + (WEAK_LABEL[entries[0].k] || entries[0].k) + '」开练 →';
+          wbtn.classList.remove('hidden');
+        }
       }
     }
   }
@@ -1407,6 +1528,13 @@
     $('btnSpeak').addEventListener('click', function () { const s = current(); if (s) speak(s.en); });
     $('btnHint').addEventListener('click', hint);
     $('btnAiHint').addEventListener('click', aiHint);
+    // P1 ④：练习页智能补强
+    const aiRem = $('btnAiRemedial'); if (aiRem) aiRem.addEventListener('click', practiceRemedial);
+    // P1 ⑥：练习页导师问答（按钮 + 回车发送）
+    const tutorAskBtn = $('btnTutorAsk'); if (tutorAskBtn) tutorAskBtn.addEventListener('click', askTutor);
+    const tutorInput = $('tutorInput'); if (tutorInput) tutorInput.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askTutor(); } });
+    // P1 ⑤：薄弱点看板一键开练
+    const weakDrillBtn = $('btnWeakDrill'); if (weakDrillBtn) weakDrillBtn.addEventListener('click', weakStartDrill);
     $('btnShowAnswer').addEventListener('click', showAnswerClicked);
     $('btnSubmit').addEventListener('click', submit);
     $('btnCollect').addEventListener('click', collect);

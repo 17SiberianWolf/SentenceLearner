@@ -89,6 +89,24 @@
         <!-- 3.6 AI 教练：句型拆解（提交/揭示答案时展示，可折叠） -->
         <section id="aiBreakdownPanel" class="coach-panel hidden" aria-label="句型拆解"></section>
 
+        <!-- 3.7 P1 ④ AI 教练：练习页闭环补强（写错后出现，手动触发） -->
+        <section id="aiRemedialPanel" class="coach-panel hidden" aria-label="智能补强">
+          <button id="btnAiRemedial" class="ai-btn">🔧 智能补强（同类小练习）</button>
+          <div id="aiRemedialList"></div>
+        </section>
+
+        <!-- 3.8 P1 ⑥ AI 教练：导师问答（带当前句上下文，可多轮追问） -->
+        <section id="aiTutorPanel" class="coach-panel hidden" aria-label="导师问答">
+          <details class="tutor" open>
+            <summary>💬 问 AI 教练（为什么这么写？）</summary>
+            <div id="tutorLog" class="tutor-log"></div>
+            <div class="tutor-input-row">
+              <input id="tutorInput" placeholder="例如：为什么这里用过去式而不是现在式？" />
+              <button id="btnTutorAsk" class="ai-btn">问</button>
+            </div>
+          </details>
+        </section>
+
         <!-- 4. 统计 -->
         <div id="stats" class="stats"></div>
 
@@ -189,6 +207,7 @@
       <div class="stats-block">
         <h3>薄弱点诊断</h3>
         <div id="weakBars" class="cat-bars"></div>
+        <button id="btnWeakDrill" class="ai-btn hidden">🎯 针对最弱项开练 →</button>
         <div id="weakEmpty" class="empty hidden">还没有诊断数据。写错句子时 AI 会自动归类（时态/语序/介词/冠词/词汇），多练几下就出来了。</div>
       </div>
     </section>

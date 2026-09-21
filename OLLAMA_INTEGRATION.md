@@ -1,6 +1,6 @@
 # SentenceLearner · 本地 Ollama 集成规划（第三期 · 修订版 v2）
 
-> 状态：研究方向已调整，规划重排中（开源调研完成，待对齐后编码）。
+> 状态：P0 已上线（2026-09-20），P1 已上线（2026-09-21）。P2（自适应生成 / 可选 AI 评分）待实施。
 > 修订要点：从「AI 评分」**重心转为「AI 辅助造句学习」**——Ollama 主要扮演** drills 教练 / 句型拆解讲师 / 薄弱点诊断师**，AI 评分降级为可选子功能（锦上添花）。
 > 目标：不联网、不依赖云端 API，用本机 Ollama 帮用户**真的学会造句**，而非仅仅判对错。
 
@@ -325,3 +325,27 @@ if (p === '/api/ollama/chat') {
 - Companion：https://github.com/shakedzy/companion
 - grammar-fixer-ollama-gemma3：https://github.com/64BitAsura/grammar-fixer-ollama-gemma3
 - Qwerty Learner（原型）：https://github.com/RealKai42/qwerty-learner
+
+---
+
+## 16. 实现进度（与决策记录）
+
+### P0（2026-09-20 上线）
+- `serve.js` 通用 Ollama 代理：`/api/ollama/status`（探活）+ `/api/ollama/chat`（透传）；`store` 白名单加 `sl_weakness`。
+- `coach.js`（新增）：`window.Coach` 模块，含 hint / breakdown / drill / remedial / tutor / generate / grade 七类 prompt；防御性 JSON 解析；状态灯。
+- 练习页：渐进提示梯 + 句型拆解（默认可折叠）；写错自动归类薄弱点。
+- 句型页：FSI Drills（替换/换人称时态/肯否疑转换）+ 写错闭环补强。
+- 统计页：薄弱点诊断看板（时态/语序/介词/冠词/词汇 5 类计数）。
+- 设置 + 状态灯联动。
+
+### P1（2026-09-21 上线，经 Grill Me 对齐：三项全做 / 补强手动触发 / 导师多轮 / 看板一键开练）
+- **④ 练习页闭环补强**：写错后答案区出现「🔧 智能补强」按钮，手动点才调 `remedial` 生成 1–3 个同类变体，作为内联小测（写完点「检查」看答案，无 SR 副作用）。
+- **⑤ 薄弱点看板驱动开练**：看板顶部按最弱类别推荐对应 FSI Drill 模式（时态→Transformation / 语序→Morphology / 介词·冠词·词汇→Substitution），「针对最弱项开练」按钮一键跳句型页自动开 Drill。
+- **⑥ 导师问答**：练习页答案区折叠面板 `askTutor`（多轮，history 存内存、刷新清空），自动带当前句中文/标准英文/用户原写作为上下文。
+- `coach.js` 重构：`callCoach` 拆出 `rawChat`，新增 `buildTutorMessages` / `askTutor` 支持多轮；`window.Coach` 暴露 `askTutor`。
+
+### P2（待实施）
+- ④ 自适应生成（`generate`）：按薄弱点 + 水平生成新练习句。
+- ⑥ 可选 AI 评分（`grade`）：仅作锦上添花，默认关闭。
+- 闭环补强 UI 进一步打磨、薄弱点看板与 SRS 联动细化。
+
