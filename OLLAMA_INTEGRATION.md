@@ -66,7 +66,7 @@
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- **Ollama 端点**：默认 `http://127.0.0.1:11434`，可用 `OLLAMA_HOST` 覆盖（服务端，前端不感知）。
+- **Ollama 端点**：默认 `http://127.0.0.1:11434`。两种覆盖方式：① 服务端环境变量 `OLLAMA_HOST`（对前端透明）；② **设置页「Ollama 地址（可选）」输入框**（UI 优先于环境变量，留空=默认）。前端每次请求携带该地址（状态探测走 `?host=`、对话走请求体 `ollamaHost`），serve.js 仅允许 `http/https` 基址（去尾斜杠），非 http(s) 直接拒绝，降低 SSRF 面。
 - **通用 chat 端点**：前端 `coach.js` 按 `task` 组装 `messages`，serve.js 仅转发并统一 `temperature`/`format`。结构化任务（`drill/hint/breakdown/remedial/generate/grade`）请求 `json:true`。
 - **模型名**：默认 `qwen2.5:7b`（讲解/教练质量优先）；高频 drill 生成可用 `qwen2.5:3b`（延迟更低）。由设置传入。
 
@@ -102,7 +102,7 @@
 - **状态**：`coachState`（当前 drill session / 当前 hint 梯级 / 薄弱点计数）。
 - **Prompt 库**：`buildMessages(task, payload)`（`task` ∈ drill/hint/breakdown/remedial/tutor/generate/grade）。
 - **调用**：`callCoach(task, payload)` → POST `/api/ollama/chat` → 防御性解析 JSON → 回调。
-- **设置**：`aiEnabled`、`ollamaModel`（默认 `qwen2.5:7b`）、持久化 `localStorage`（`sl_ai_*`）。
+- **设置**：`aiEnabled`、`ollamaModel`（默认 `qwen2.5:7b`）、`ollamaHost`（可选，UI 优先于 `OLLAMA_HOST` 环境变量）、持久化 `localStorage`（`sl_ai_*`）。改地址后自动重探状态灯并刷新模型下拉框。
 - **探活**：启动 + 设置变更时 `fetch('/api/ollama/status')` → 更新状态灯。
 
 ### 5.2 练习页（app.js / index.html）

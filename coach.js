@@ -11,6 +11,11 @@
   function saveEnabled(v) { try { localStorage.setItem('sl_ai_enabled', v ? 'true' : 'false'); } catch (e) {} }
   function loadModel() { try { return localStorage.getItem('sl_ai_model') || DEFAULT_MODEL; } catch (e) { return DEFAULT_MODEL; } }
   function saveModel(v) { try { localStorage.setItem('sl_ai_model', v || DEFAULT_MODEL); } catch (e) {} }
+  // Ollama 基址：设置页可填（UI 优先于环境变量），留空则用 serve.js 默认/环境变量
+  function loadHost() { try { return localStorage.getItem('sl_ollama_host') || ''; } catch (e) { return ''; } }
+  function saveHost(v) { try { if (v) localStorage.setItem('sl_ollama_host', v); else localStorage.removeItem('sl_ollama_host'); } catch (e) {} }
+  function getOllamaHost() { return loadHost(); }
+  function setOllamaHost(v) { saveHost((v || '').trim()); }
 
   function isEnabled() { return loadEnabled(); }
   function getModel() { return loadModel(); }
@@ -89,7 +94,7 @@
       fetch('/api/ollama/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: getModel(), messages: msgs, task: opts.task, json: !!opts.json, temp: (typeof opts.temp === 'number' ? opts.temp : 0.3) })
+        body: JSON.stringify({ model: getModel(), messages: msgs, task: opts.task, json: !!opts.json, temp: (typeof opts.temp === 'number' ? opts.temp : 0.3), ollamaHost: getOllamaHost() || undefined })
       })
         .then(function (r) { return r.json(); })
         .then(function (j) {
@@ -146,7 +151,9 @@
       if (settled) return; settled = true;
       status.ok = false; setStatusDom(false, '未连接'); if (cb) cb(false);
     }, 6000);
-    fetch('/api/ollama/status', { cache: 'no-store' })
+    const h = getOllamaHost();
+    const statusUrl = '/api/ollama/status' + (h ? ('?host=' + encodeURIComponent(h)) : '');
+    fetch(statusUrl, { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (settled) return; settled = true; clearTimeout(guard);
@@ -166,6 +173,8 @@
     getModel: getModel,
     setEnabled: setEnabled,
     setModel: setModel,
+    getOllamaHost: getOllamaHost,
+    setOllamaHost: setOllamaHost,
     isGradeEnabled: isGradeEnabled,
     setGradeEnabled: setGradeEnabled,
     recordWeakness: recordWeakness,

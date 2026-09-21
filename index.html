@@ -51,14 +51,19 @@
           <label class="review-toggle"><input type="checkbox" id="reviewMode" /> 🔁 复习模式</label>
           <label class="review-toggle"><input type="checkbox" id="aiEnabled" checked /> 🤖 AI 教练</label>
           <label class="review-toggle"><input type="checkbox" id="aiGradeEnabled" /> 📊 AI 评分（可选）</label>
-          <label>模型
-            <select id="aiModel">
-              <option value="qwen2.5:7b">qwen2.5:7b</option>
-              <option value="qwen2.5:3b">qwen2.5:3b（更快）</option>
-              <option value="llama3.1:8b">llama3.1:8b</option>
-              <option value="gemma2:9b">gemma2:9b</option>
-            </select>
-          </label>
+          <span class="ai-config">
+            <label>模型
+              <select id="aiModel">
+                <option value="qwen2.5:7b">qwen2.5:7b</option>
+                <option value="qwen2.5:3b">qwen2.5:3b（更快）</option>
+                <option value="llama3.1:8b">llama3.1:8b</option>
+                <option value="gemma2:9b">gemma2:9b</option>
+              </select>
+            </label>
+            <label>Ollama 地址（可选）
+              <input id="ollamaHost" type="text" placeholder="http://127.0.0.1:11434" spellcheck="false" autocomplete="off" title="留空=本机 127.0.0.1:11434；跨机填 http://其他IP:11434" />
+            </label>
+          </span>
         </div>
       </div>
 

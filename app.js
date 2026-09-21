@@ -1600,6 +1600,19 @@
       aiMd.value = (window.Coach && Coach.getModel()) || 'qwen2.5:7b';
       aiMd.addEventListener('change', function () { if (window.Coach) Coach.setModel(aiMd.value); });
     }
+    // Ollama 地址（可选，UI 优先于环境变量）：失焦/改动即保存 + 刷新模型下拉 + 重探状态灯
+    const ollamaHost = $('ollamaHost');
+    if (ollamaHost) {
+      ollamaHost.value = (window.Coach && Coach.getOllamaHost()) || '';
+      const onHostChange = function () {
+        if (!window.Coach) return;
+        Coach.setOllamaHost(ollamaHost.value);
+        refreshModelDropdown();
+        Coach.updateStatus(refreshAiButtons);
+      };
+      ollamaHost.addEventListener('change', onHostChange);
+      ollamaHost.addEventListener('blur', onHostChange);
+    }
     initCategories();
     buildList();
     resetQuestion();
@@ -1749,9 +1762,31 @@
       window.speechSynthesis.onvoiceschanged = function () { window.speechSynthesis.getVoices(); };
     }
     initStorage();
-    // AI 教练：探活状态灯，并按可用性启用/禁用 AI 按钮
-    if (window.Coach) { Coach.updateStatus(refreshAiButtons); }
+    // AI 教练：探活状态灯，并按可用性启用/禁用 AI 按钮；同时用探测到的模型刷新下拉框
+    if (window.Coach) { Coach.updateStatus(function (ok) { refreshAiButtons(); refreshModelDropdown(); }); }
     focusCapture();
+  }
+
+  // 用探测到的模型列表刷新模型下拉框：默认项 + 探测项并集，保留当前选中；未连上时不覆盖默认项
+  function refreshModelDropdown() {
+    const sel = $('aiModel');
+    if (!sel || !window.Coach) return;
+    const detected = (window.Coach.status && window.Coach.status.models) || [];
+    const current = sel.value;
+    if (!detected.length) return;
+    const labels = {};
+    Array.prototype.forEach.call(sel.options, function (o) { labels[o.value] = o.textContent; });
+    const defaults = ['qwen2.5:7b', 'qwen2.5:3b', 'llama3.1:8b', 'gemma2:9b'];
+    const all = defaults.slice();
+    detected.forEach(function (m) { if (all.indexOf(m) === -1) all.push(m); });
+    if (current && all.indexOf(current) === -1) all.push(current);
+    sel.innerHTML = '';
+    all.forEach(function (m) {
+      const o = document.createElement('option');
+      o.value = m; o.textContent = labels[m] || m;
+      sel.appendChild(o);
+    });
+    if (current) sel.value = current;
   }
 
   // 根据 AI 是否启用/可用，刷新练习页与句型页相关按钮的可用态

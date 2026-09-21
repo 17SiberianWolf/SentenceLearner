@@ -98,9 +98,18 @@ const server = http.createServer(function (req, res) {
   }
 
   // ---- Ollama 代理（本地大模型，零依赖；浏览器只调同源 8787） ----
-  const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
+  // 解析 Ollama 基址：请求携带的 override 优先，其次 OLLAMA_HOST 环境变量，最后默认本机 11434。
+  // 安全：仅允许 http/https 基址（去掉结尾斜杠），非 http(s) 返回 null 由调用方拒绝，降低 SSRF 面。
+  function resolveOllamaHost(override) {
+    const ov = (override != null) ? String(override).trim() : '';
+    const h = ov || process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
+    if (!/^https?:\/\//i.test(h)) return null;
+    return h.replace(/\/+$/, '');
+  }
 
   if (p === '/api/ollama/status') {
+    const target = resolveOllamaHost(u.searchParams.get('host'));
+    if (!target) { sendJson(res, 200, { ok: false, models: [], error: 'invalid host' }); return; }
     // 健壮性：无论 fetch 是否支持 / 是否超时 / 是否抛异常，都保证在兜底时间内响应，
     // 避免前端状态灯永久卡在“检测中…”
     let done = false;
@@ -114,7 +123,7 @@ const server = http.createServer(function (req, res) {
     const opts = { method: 'GET' };
     if (ac) opts.signal = ac;
     try {
-      fetch(OLLAMA_HOST + '/api/tags', opts)
+      fetch(target + '/api/tags', opts)
         .then(function (r) { return r.json(); })
         .then(function (j) { reply(true, (j.models || []).map(function (m) { return m.name; })); })
         .catch(function (e) { reply(false, [], String((e && e.message) || e)); });
@@ -133,11 +142,13 @@ const server = http.createServer(function (req, res) {
       if (aborted) { sendJson(res, 413, { error: 'payload too large' }); return; }
       let body;
       try { body = JSON.parse(raw); } catch (e) { sendJson(res, 400, { error: 'invalid json' }); return; }
+      const target = resolveOllamaHost(body.ollamaHost);
+      if (!target) { sendJson(res, 200, { ok: false, error: 'invalid ollama host' }); return; }
       const model = body.model || 'qwen2.5:7b';
       const temp = (typeof body.temp === 'number') ? body.temp : 0.3;
       const messages = Array.isArray(body.messages) ? body.messages : [];
       const format = body.json ? 'json' : undefined;
-      fetch(OLLAMA_HOST + '/api/chat', {
+      fetch(target + '/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: model, messages: messages, stream: false, temperature: temp, format: format }),
