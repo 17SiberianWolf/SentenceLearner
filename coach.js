@@ -140,15 +140,25 @@
   }
   function updateStatus(cb) {
     if (typeof fetch !== 'function') { status.ok = false; setStatusDom(false, '不可用'); if (cb) cb(false); return; }
+    let settled = false;
+    // 兜底：服务端连接被半开挂着（既不成功也不失败）时，6s 后强制翻成“未连接”，避免永久“检测中…”
+    const guard = setTimeout(function () {
+      if (settled) return; settled = true;
+      status.ok = false; setStatusDom(false, '未连接'); if (cb) cb(false);
+    }, 6000);
     fetch('/api/ollama/status', { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (j) {
+        if (settled) return; settled = true; clearTimeout(guard);
         status.ok = !!(j && j.ok);
         status.models = (j && j.models) || [];
         setStatusDom(status.ok, status.ok ? ('已连 · ' + (status.models[0] || '')) : '未连接');
         if (cb) cb(status.ok);
       })
-      .catch(function (e) { status.ok = false; setStatusDom(false, '未连接'); if (cb) cb(false); });
+      .catch(function (e) {
+        if (settled) return; settled = true; clearTimeout(guard);
+        status.ok = false; setStatusDom(false, '未连接'); if (cb) cb(false);
+      });
   }
 
   window.Coach = {

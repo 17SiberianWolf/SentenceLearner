@@ -101,12 +101,26 @@ const server = http.createServer(function (req, res) {
   const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
 
   if (p === '/api/ollama/status') {
-    (function () {
-      fetch(OLLAMA_HOST + '/api/tags', { signal: AbortSignal.timeout(3000) })
+    // 健壮性：无论 fetch 是否支持 / 是否超时 / 是否抛异常，都保证在兜底时间内响应，
+    // 避免前端状态灯永久卡在“检测中…”
+    let done = false;
+    const guard = setTimeout(function () { if (!done) { done = true; sendJson(res, 200, { ok: false, models: [], error: 'timeout' }); } }, 5000);
+    const reply = function (ok, models, error) {
+      if (done) return; done = true; clearTimeout(guard);
+      sendJson(res, 200, { ok: ok, models: models || [], error: error || '' });
+    };
+    if (typeof fetch !== 'function') { reply(false, [], 'fetch unavailable'); return; }
+    const ac = (typeof AbortSignal !== 'undefined' && AbortSignal && AbortSignal.timeout) ? AbortSignal.timeout(3000) : null;
+    const opts = { method: 'GET' };
+    if (ac) opts.signal = ac;
+    try {
+      fetch(OLLAMA_HOST + '/api/tags', opts)
         .then(function (r) { return r.json(); })
-        .then(function (j) { sendJson(res, 200, { ok: true, models: (j.models || []).map(function (m) { return m.name; }) }); })
-        .catch(function (e) { sendJson(res, 200, { ok: false, error: String((e && e.message) || e) }); });
-    })();
+        .then(function (j) { reply(true, (j.models || []).map(function (m) { return m.name; })); })
+        .catch(function (e) { reply(false, [], String((e && e.message) || e)); });
+    } catch (e) {
+      reply(false, [], String((e && e.message) || e));
+    }
     return;
   }
 
