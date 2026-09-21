@@ -491,3 +491,29 @@ body {
 #patDrillBar select { padding: 5px 8px; border-radius: 8px; border: 1px solid var(--border, #e3e8ef); }
 #patDrillBanner { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
 #patDrillProgress { font-size: 13px; }
+
+/* P2 ⑥ 可选 AI 评分面板 */
+#aiGradePanel .ai-btn { margin-bottom: 8px; }
+.grade-head { font-size: 15px; font-weight: 700; margin: 6px 0; color: var(--ink, #1f2937); }
+.grade-verdict { padding: 1px 8px; border-radius: 8px; font-weight: 700; }
+.grade-verdict.correct { background: #dcfce7; color: #15803d; }
+.grade-verdict.partial { background: #fef9c3; color: #a16207; }
+.grade-verdict.wrong { background: #fee2e2; color: #b91c1c; }
+.grade-corrected { font-size: 14px; margin: 6px 0; padding: 7px 10px; background: #f7f9fc; border-radius: 8px; color: var(--ink, #1f2937); }
+.grade-errors { margin: 6px 0; }
+.grade-sub { font-size: 12px; color: var(--muted, #6b7280); margin-bottom: 3px; }
+.grade-errors ul { margin: 0; padding-left: 18px; }
+.grade-errors li { font-size: 13px; margin: 3px 0; color: var(--ink, #1f2937); }
+.grade-comment { font-size: 14px; margin: 6px 0; padding: 7px 10px; background: #fffbeb; border-radius: 8px; color: #92400e; }
+.grade-note { font-size: 12px; color: var(--muted, #6b7280); margin-top: 6px; }
+
+/* P2 ④ 自适应生成练习句面板 */
+#aiGenPanel .ai-btn { margin-bottom: 8px; }
+.gen-title { font-size: 13px; color: var(--muted, #6b7280); margin: 6px 0; }
+.gen-item { border: 1px solid var(--border, #e3e8ef); border-radius: 10px; padding: 9px 11px; margin: 7px 0; background: #fff; }
+.gen-zh { font-size: 14px; color: var(--ink, #1f2937); }
+.gen-meta { font-size: 12px; color: var(--muted, #6b7280); margin: 3px 0 6px; }
+.gen-actions { display: flex; gap: 8px; }
+.gen-actions .ai-btn { font-size: 13px; padding: 5px 11px; }
+.gen-save { background: #fff; color: var(--accent, #185fa5); border: 1px solid var(--accent, #185fa5); }
+.gen-save:disabled { opacity: .6; cursor: default; }

@@ -156,6 +156,8 @@
     getModel: getModel,
     setEnabled: setEnabled,
     setModel: setModel,
+    isGradeEnabled: isGradeEnabled,
+    setGradeEnabled: setGradeEnabled,
     recordWeakness: recordWeakness,
     getWeakness: getWeakness,
     callCoach: callCoach,

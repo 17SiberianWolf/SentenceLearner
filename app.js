@@ -364,6 +364,9 @@
     const tp = $('aiTutorPanel'); if (tp) { tp.classList.add('hidden'); }
     const tl = $('tutorLog'); if (tl) tl.innerHTML = '';
     tutorHistory = [];
+    // P2 ⑥④：清掉评分结果与生成面板（新一题重新开始）
+    const gp = $('aiGradePanel'); if (gp) { gp.classList.add('hidden'); const gr = $('aiGradeResult'); if (gr) gr.innerHTML = ''; const gbtn = $('btnAiGrade'); if (gbtn) gbtn.disabled = false; }
+    const genp = $('aiGenPanel'); if (genp) { genp.classList.add('hidden'); const gl = $('aiGenList'); if (gl) gl.innerHTML = ''; }
   }
 
   // ---------- AI 教练：渐进提示梯（不直接给答案，分 3 级） ----------
@@ -511,6 +514,86 @@
     const sel = $('patDrillMode');
     if (sel) sel.value = mode;
     patDrillStart();
+  }
+
+  // ---------- P2 ④ AI 教练：自适应生成练习句（按薄弱点生成 5 题，可练/可入库） ----------
+  function practiceGenerate() {
+    const p = $('aiGenPanel');
+    const listEl = $('aiGenList');
+    if (!listEl) return;
+    if (!window.Coach || !Coach.isEnabled()) { alert('AI 教练未启用或 Ollama 未连接，无法生成练习句。'); return; }
+    p.classList.remove('hidden');
+    listEl.innerHTML = '<div class="ai-loading">AI 正在按薄弱点生成练习句…</div>';
+    const cat = weakTopCategory() || 'vocabulary';
+    Coach.callCoach('generate', { level: state.level, category: cat }, { json: true, temp: 0.6 }).then(function (r) {
+      if (!r || !r.ok || !r.data || !Array.isArray(r.data.sentences) || !r.data.sentences.length) {
+        listEl.innerHTML = '<div class="ai-err">生成失败：' + escapeHtml((r && r.error) || '无句子') + '</div>';
+        return;
+      }
+      renderGenerated(r.data.sentences);
+    });
+  }
+  function renderGenerated(sentences) {
+    const listEl = $('aiGenList');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="gen-title">🎲 AI 生成练习句（点「练这道」替换当前题，或「存入题库」加入你的句库）</div>';
+    sentences.forEach(function (d) {
+      const item = document.createElement('div');
+      item.className = 'gen-item';
+      const zh = document.createElement('div'); zh.className = 'gen-zh'; zh.textContent = '· ' + (d.zh || '');
+      const meta = document.createElement('div'); meta.className = 'gen-meta'; meta.textContent = '难度：' + (d.level || state.level);
+      const row = document.createElement('div'); row.className = 'gen-actions';
+      const btnUse = document.createElement('button'); btnUse.className = 'ai-btn gen-use'; btnUse.textContent = '练这道';
+      btnUse.addEventListener('click', function () { practiceGenerateUse(d); });
+      const btnSave = document.createElement('button'); btnSave.className = 'ai-btn gen-save'; btnSave.textContent = '存入题库';
+      btnSave.addEventListener('click', function () {
+        const res = addCustomSentence(d.zh, d.en, state.category);
+        if (res && res.ok) { btnSave.textContent = '已入库 ✓'; btnSave.disabled = true; refreshLibCategories(); renderLibrary(); }
+        else if (res) { btnSave.textContent = res.msg || '入库失败'; }
+      });
+      row.appendChild(btnUse); row.appendChild(btnSave);
+      item.appendChild(zh); item.appendChild(meta); item.appendChild(row);
+      listEl.appendChild(item);
+    });
+  }
+  function practiceGenerateUse(d) {
+    const s = current();
+    if (!s) return;
+    state.list[state.index] = { id: 'gen-' + Date.now(), zh: d.zh, en: d.en, level: state.level, category: state.category };
+    const p = $('aiGenPanel'); if (p) p.classList.add('hidden');
+    const gl = $('aiGenList'); if (gl) gl.innerHTML = '';
+    resetQuestion();
+    const cap = $('capture'); if (cap) cap.focus();
+  }
+
+  // ---------- P2 ⑥ AI 教练：可选 AI 评分（默认关，手动触发，不污染 SR） ----------
+  function gradeCurrent() {
+    const s = current();
+    const box = $('aiGradeResult');
+    const btn = $('btnAiGrade');
+    if (!box) return;
+    if (!window.Coach || !Coach.isEnabled()) { alert('AI 教练未启用或 Ollama 未连接，无法评分。'); return; }
+    if (btn) btn.disabled = true;
+    box.innerHTML = '<div class="ai-loading">AI 正在评分…</div>';
+    Coach.callCoach('grade', { target: s.zh, text: state.input, reference: s.en }, { json: true, temp: 0.2 }).then(function (r) {
+      if (btn) btn.disabled = false;
+      if (!r || !r.ok || !r.data) { box.innerHTML = '<div class="ai-err">评分失败：' + escapeHtml((r && r.error) || '') + '</div>'; return; }
+      renderGrade(r.data);
+    });
+  }
+  function renderGrade(d) {
+    const box = $('aiGradeResult');
+    if (!box) return;
+    const verdictMap = { correct: '✓ 正确', partial: '~ 部分正确', wrong: '✗ 有误' };
+    const errors = Array.isArray(d.errors) ? d.errors.map(function (e) {
+      return '<li><b>' + escapeHtml(e.type || '错误') + '</b>：' + escapeHtml(e.original || '') + ' → ' + escapeHtml(e.correction || '') + '（' + escapeHtml(e.explanation || '') + '）</li>';
+    }).join('') : '';
+    box.innerHTML =
+      '<div class="grade-head">判定：<span class="grade-verdict ' + (d.verdict || '') + '">' + (verdictMap[d.verdict] || d.verdict || '—') + '</span> · 分数 <b>' + (d.score != null ? d.score : '—') + '/100</b></div>' +
+      (d.corrected ? '<div class="grade-corrected">修正句：' + escapeHtml(d.corrected) + '</div>' : '') +
+      (errors ? '<div class="grade-errors"><div class="grade-sub">逐条错误</div><ul>' + errors + '</ul></div>' : '') +
+      (d.comment ? '<div class="grade-comment">' + escapeHtml(d.comment) + '</div>' : '') +
+      '<div class="grade-note">⚠️ AI 评分仅供辅助参考，不计入掌握度与间隔重复。</div>';
   }
 
   function updateStats() {
@@ -1678,6 +1761,9 @@
     const usable = enabled && ok;
     const aiHintBtn = $('btnAiHint'); if (aiHintBtn) aiHintBtn.disabled = !usable;
     const drillBtn = $('patDrillBtn'); if (drillBtn) drillBtn.disabled = !usable;
+    // P2 ④⑥：生成 / 评分按钮 —— 生成只需 AI 可用；评分还需评分开关打开
+    const genBtn = $('btnAiGen'); if (genBtn) genBtn.disabled = !usable;
+    const gradeBtn = $('btnAiGrade'); if (gradeBtn) gradeBtn.disabled = !(usable && window.Coach && Coach.isGradeEnabled());
     const aiEn = $('aiEnabled');
     if (aiEn && !enabled) {
       const h = $('aiHintPanel'); if (h) { h.classList.remove('hidden'); h.innerHTML = '<div class="ai-err">AI 教练已关闭，在工具栏勾选「🤖 AI 教练」并连接 Ollama 后可用。</div>'; }

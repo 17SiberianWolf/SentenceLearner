@@ -50,6 +50,7 @@
           <label class="review-toggle"><input type="checkbox" id="autoSpeak" checked /> 🔊 自动朗读</label>
           <label class="review-toggle"><input type="checkbox" id="reviewMode" /> 🔁 复习模式</label>
           <label class="review-toggle"><input type="checkbox" id="aiEnabled" checked /> 🤖 AI 教练</label>
+          <label class="review-toggle"><input type="checkbox" id="aiGradeEnabled" /> 📊 AI 评分（可选）</label>
           <label>模型
             <select id="aiModel">
               <option value="qwen2.5:7b">qwen2.5:7b</option>
@@ -107,6 +108,18 @@
           </details>
         </section>
 
+        <!-- 3.9 P2 ⑥ AI 教练：可选 AI 评分（默认关，手动触发，不计入掌握度） -->
+        <section id="aiGradePanel" class="coach-panel hidden" aria-label="AI 评分">
+          <button id="btnAiGrade" class="ai-btn">📊 给当前句评分（AI）</button>
+          <div id="aiGradeResult"></div>
+        </section>
+
+        <!-- 3.10 P2 ④ AI 教练：自适应生成练习句（按薄弱点生成 5 题，可选入库） -->
+        <section id="aiGenPanel" class="coach-panel hidden" aria-label="生成练习句">
+          <button id="btnAiGenRun" class="ai-btn">🎲 重新生成</button>
+          <div id="aiGenList"></div>
+        </section>
+
         <!-- 4. 统计 -->
         <div id="stats" class="stats"></div>
 
@@ -123,6 +136,9 @@
           </button>
           <button id="btnAiHint" title="AI 教练：卡壳时给分级提示（不直接给答案）">
             <span class="icon">💡</span> AI 提示
+          </button>
+          <button id="btnAiGen" title="AI 教练：按薄弱点生成 5 个练习句">
+            <span class="icon">🎲</span> 生成练习句
           </button>
           <button id="btnSubmit" title="提交判分（快捷键 Enter）">
             <span class="icon">✓</span> 提交
